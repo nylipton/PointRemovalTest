@@ -29,37 +29,47 @@ public class PointRemovalTest
 		int POINTS = 5000 ; // points to draw on the screen
 		int DIST = 30 ; // minimum distance between points
 		int CLUSTERS = 10 ; // clusters to distribute the data
-		new PointRemovalTest( WIDTH, HEIGHT, POINTS, DIST, CLUSTERS ) ;
+		PointRemovalTest test = new PointRemovalTest( ) ;
+		test.execute( true, WIDTH, HEIGHT, POINTS, DIST, CLUSTERS ) ;
 	}
 	
-	public PointRemovalTest( int width, int height, int points, int distance, int clusters )
+	public PointRemovalTest( )
+	{
+		nf.setMinimumFractionDigits( 4 ) ;
+	}
+	
+	public void execute( boolean draw, int width, int height, int points, int distance, int clusters )
 	{
 		Dataset dataset = new DefaultDataset( ) ;
 //		Clusterer clusterer = new DensityBasedSpatialClustering( .009, 2 ) ;
 		Clusterer clusterer = new KMeans( clusters ) ;
 //		Clusterer clusterer = new KMedoids( ) ;
 //		Clusterer clusterer = new SOM( ) ;
-		nf.setMinimumFractionDigits( 4 ) ;
 		
-		// set up window frames
-		JFrame allDataFrame = new JFrame( "All Data" ) ;
-		allDataFrame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
-		allDataFrame.setMinimumSize( new Dimension( width, height ) );
-		JFrame shownDataFrame = new JFrame( "Shown Data" ) ;
-		shownDataFrame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
-		shownDataFrame.setMinimumSize( new Dimension( width, height ) );
-		JFrame calcDataFrame = new JFrame( "Calculated Data" ) ;
-		calcDataFrame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
-		calcDataFrame.setMinimumSize( new Dimension( width, height ) );
-		calcDataFrame.setLocation( allDataFrame.getLocation( ).x + width + 10, allDataFrame.getLocation( ).y );
-		shownDataFrame.setLocation( allDataFrame.getLocation( ).x, allDataFrame.getLocation( ).y + height + 10 );
-		calcDataFrame.setVisible( true ) ;
-		allDataFrame.setVisible( true ) ;
-		shownDataFrame.setVisible( true );
-		Cursor c = allDataFrame.getCursor( ) ;
-		allDataFrame.setCursor( Cursor.getPredefinedCursor( Cursor.WAIT_CURSOR ) ) ;
-		calcDataFrame.setCursor( Cursor.getPredefinedCursor( Cursor.WAIT_CURSOR ) ) ;
-		shownDataFrame.setCursor( Cursor.getPredefinedCursor( Cursor.WAIT_CURSOR ) ) ;
+		JFrame allDataFrame = null, shownDataFrame = null, calcDataFrame = null ;
+		Cursor c = null ;
+		if( draw )
+		{
+			// set up window frames
+			allDataFrame = new JFrame( "All Data" ) ;
+			allDataFrame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
+			allDataFrame.setMinimumSize( new Dimension( width, height ) );
+			shownDataFrame = new JFrame( "Shown Data" ) ;
+			shownDataFrame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
+			shownDataFrame.setMinimumSize( new Dimension( width, height ) );
+			calcDataFrame = new JFrame( "Calculated Data" ) ;
+			calcDataFrame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
+			calcDataFrame.setMinimumSize( new Dimension( width, height ) );
+			calcDataFrame.setLocation( allDataFrame.getLocation( ).x + width + 10, allDataFrame.getLocation( ).y );
+			shownDataFrame.setLocation( allDataFrame.getLocation( ).x, allDataFrame.getLocation( ).y + height + 10 );
+			calcDataFrame.setVisible( true ) ;
+			allDataFrame.setVisible( true ) ;
+			shownDataFrame.setVisible( true );
+			c = allDataFrame.getCursor( ) ;
+			allDataFrame.setCursor( Cursor.getPredefinedCursor( Cursor.WAIT_CURSOR ) ) ;
+			calcDataFrame.setCursor( Cursor.getPredefinedCursor( Cursor.WAIT_CURSOR ) ) ;
+			shownDataFrame.setCursor( Cursor.getPredefinedCursor( Cursor.WAIT_CURSOR ) ) ;
+		}
 		
 		// calculate random data points
 		System.out.println( "calculating data..." );
@@ -91,12 +101,15 @@ public class PointRemovalTest
 		System.arraycopy( removeData, 0, totalRemoveData, 0, removeData.length ) ;
 		System.arraycopy( removeData2, 0, totalRemoveData, removeData.length, removeData2.length ) ;
 		
-		// draw all of the data
-		System.out.println( "drawing..." ) ;
-		draw( calcDataFrame, allDataFrame, shownDataFrame, dataset, data, totalRemoveData ) ;
-		shownDataFrame.setCursor( c ) ;
-		calcDataFrame.setCursor( c ) ; 
-		allDataFrame.setCursor( c ) ; // done
+		if( draw )
+		{
+			// draw all of the data
+			System.out.println( "drawing..." ) ;
+			draw( calcDataFrame, allDataFrame, shownDataFrame, dataset, data, totalRemoveData ) ;
+			shownDataFrame.setCursor( c ) ;
+			calcDataFrame.setCursor( c ) ; 
+			allDataFrame.setCursor( c ) ; // done
+		}
 	}
 	
 	/**
