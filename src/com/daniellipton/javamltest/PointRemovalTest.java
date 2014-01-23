@@ -9,6 +9,7 @@ import java.awt.Point;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Random;
 
 import javax.swing.JFrame;
 
@@ -26,9 +27,9 @@ public class PointRemovalTest
 	public static void main( String[] args )
 	{
 		int WIDTH = 1920/3, HEIGHT = 1080/3 ;
-		int POINTS = 5000 ; // points to draw on the screen
-		int DIST = 30 ; // minimum distance between points
-		int CLUSTERS = 10 ; // clusters to distribute the data
+		int POINTS = 10000 ; // points to draw on the screen
+		int DIST = 10 ; // minimum distance between points
+		int CLUSTERS = 15 ; // clusters to distribute the data
 		PointRemovalTest test = new PointRemovalTest( ) ;
 		test.execute( true, WIDTH, HEIGHT, POINTS, DIST, CLUSTERS ) ;
 	}
@@ -71,10 +72,26 @@ public class PointRemovalTest
 			shownDataFrame.setCursor( Cursor.getPredefinedCursor( Cursor.WAIT_CURSOR ) ) ;
 		}
 		
-		// calculate random data points
+		// calculate random data points around clusters
 		System.out.println( "calculating data..." );
-		for( int i = 0 ; i < points ; i++ )
-			addData( dataset, width, height ) ;
+		double latStdev = height / 15, longStdev = width / 15 ;
+		Random rand = new Random( System.currentTimeMillis( ) ) ;
+		for( int i = 0 ; i < clusters ; i++ )
+		{
+			double longt = rand.nextInt( width ) ;
+			double lat = rand.nextInt( height )  ;
+			double[] vals = { longt, lat } ;
+			Instance inst = new DenseInstance( vals ) ;
+			dataset.add( inst ) ;
+			for( int j = 0 ; j < ( points/clusters - 1 ) ; j++ )
+			{
+				double y = Math.max( 1, Math.min( height, ( int ) lat + rand.nextGaussian( ) * latStdev ) ) ;
+				double x = Math.max( 1, Math.min( width, ( int ) longt + rand.nextGaussian( ) * longStdev ) ) ;
+				vals = new double[]{ x, y } ;
+				inst = new DenseInstance( vals ) ;
+				dataset.add( inst ) ;
+			}
+		}
 		
 		// find points to remove
 		System.out.println( "clustering..." );
