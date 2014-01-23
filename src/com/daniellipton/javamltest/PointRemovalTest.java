@@ -1,17 +1,25 @@
 package com.daniellipton.javamltest;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Point;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Random;
 
+import javax.swing.BorderFactory;
+import javax.swing.ButtonGroup;
+import javax.swing.JComponent;
 import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.JRadioButton;
 
 import net.sf.javaml.clustering.Clusterer;
 import net.sf.javaml.clustering.DensityBasedSpatialClustering;
@@ -34,7 +42,7 @@ public class PointRemovalTest
 	public static void main( String[] args )
 	{
 		int WIDTH = 1920/3, HEIGHT = 1080/3 ;
-		int POINTS = 5000 ; // points to draw on the screen
+		int POINTS = 500 ; // points to draw on the screen
 		int DIST = 10 ; // minimum distance between points
 		int CLUSTERS = POINTS/50 ; // clusters to distribute the data
 		PointRemovalTest test = new PointRemovalTest( ) ;
@@ -54,29 +62,29 @@ public class PointRemovalTest
 //		Clusterer clusterer = new KMedoids( ) ;
 //		Clusterer clusterer = new SOM( ) ;
 		
-		JFrame allDataFrame = null, shownDataFrame = null, calcDataFrame = null ;
+		JFrame frame = null ;
 		Cursor c = null ;
+		PaintWindowComponent pwc = null ;
+		ControlsPanel controlsPanel = null ;
 		if( draw )
 		{
 			// set up window frames
-			allDataFrame = new JFrame( "All Data" ) ;
-			shownDataFrame = new JFrame( "Shown Data" ) ;
-			calcDataFrame = new JFrame( "Calculated Data" ) ;
-			allDataFrame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
-			allDataFrame.setMinimumSize( new Dimension( width, height ) );
-			shownDataFrame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
-			shownDataFrame.setMinimumSize( new Dimension( width, height ) );
-			calcDataFrame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
-			calcDataFrame.setMinimumSize( new Dimension( width, height ) );
-			calcDataFrame.setLocation( allDataFrame.getLocation( ).x + width + 10, allDataFrame.getLocation( ).y );
-			shownDataFrame.setLocation( allDataFrame.getLocation( ).x, allDataFrame.getLocation( ).y + height + 10 );
-			calcDataFrame.setVisible( true ) ;
-			allDataFrame.setVisible( true ) ;
-			shownDataFrame.setVisible( true );
-			c = allDataFrame.getCursor( ) ;
-			allDataFrame.setCursor( Cursor.getPredefinedCursor( Cursor.WAIT_CURSOR ) ) ;
-			calcDataFrame.setCursor( Cursor.getPredefinedCursor( Cursor.WAIT_CURSOR ) ) ;
-			shownDataFrame.setCursor( Cursor.getPredefinedCursor( Cursor.WAIT_CURSOR ) ) ;
+			frame = new JFrame( "Point Density Test" ) ;
+			frame.getContentPane( ).setLayout( new BorderLayout( ) );
+			pwc = new PaintWindowComponent( ) ;
+			controlsPanel = new ControlsPanel( pwc ) ;
+
+			frame.getContentPane( ).add( pwc, BorderLayout.CENTER ) ;
+			frame.getContentPane( ).add( controlsPanel, BorderLayout.NORTH ) ;
+			frame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
+			pwc.setPreferredSize( new Dimension( width, height ) ) ;
+			pwc.setBorder( BorderFactory.createEtchedBorder( ) );
+			frame.pack( ) ;
+
+			frame.setVisible( true ) ;
+			c = frame.getCursor( ) ;
+			frame.setCursor( Cursor.getPredefinedCursor( Cursor.WAIT_CURSOR ) ) ;
+			controlsPanel.setEnabled( false ) ;
 		}
 		
 		// calculate random data points around clusters
@@ -127,10 +135,12 @@ public class PointRemovalTest
 		{
 			// draw all of the data
 			System.out.println( "drawing..." ) ;
-			draw( calcDataFrame, allDataFrame, shownDataFrame, dataset, data, totalRemoveData ) ;
-			shownDataFrame.setCursor( c ) ;
-			calcDataFrame.setCursor( c ) ; 
-			allDataFrame.setCursor( c ) ; // done
+			pwc.setData( dataset, data, totalRemoveData ) ;
+//			shownDataFrame.setCursor( c ) ;
+//			calcDataFrame.setCursor( c ) ; 
+			frame.setCursor( c ) ; // done
+			controlsPanel.setEnabled( true ) ;
+			pwc.repaint( ) ;
 		}
 	}
 
@@ -231,110 +241,196 @@ public class PointRemovalTest
 		System.out.println( "clustering time="+nf.format( t2 ) ) ;
 		return dArray ;
 	}
-
+	
 	/**
-	 * Draws the given data
-	 * 
-	 * @param allDataFrame make sure to set the size and make visible outside of this method
-	 * @param allData	All of the data points
-	 * @param clusterData	All of the sets of clusters
-	 * @param removeData	The data points to be "removed"
+	 * Control panel for this display
 	 */
-	private void draw( 
-			JFrame calcDataFrame,
-			JFrame allDataFrame,
-			JFrame shownDataFrame,
-			Dataset allData, 
-			Dataset[] clusterData,
-			Dataset[] removeData )
+	class ControlsPanel
+	extends JPanel implements ActionListener
 	{
-		FastConvexHull hullExecutor = new FastConvexHull( ) ;
-		Graphics allGraphics = allDataFrame.getGraphics( ) ; // show all data points
-		Font f = allGraphics.getFont( ).deriveFont( 8.0f ) ;
-		allGraphics.setFont( f ) ;
-		Graphics shownGraphics = shownDataFrame.getGraphics( ) ; // show w/o removed data
-		f = shownGraphics.getFont( ).deriveFont( 8.0f ) ;
-		shownGraphics.setFont( f ) ;
-		Graphics calcGraphics = calcDataFrame.getGraphics( ) ; // show all data w/ clusters & highlighted removals
-		f = calcGraphics.getFont( ).deriveFont( 8.0f ) ;
-		calcGraphics.setFont( f ) ;
+		final String ALL = "all data", CALC = "calculated data", SHOWN = "shown data" ;
+		PaintWindowComponent pwc ;
+		JRadioButton allButton, calculatedButton, shownButton ;
 		
-		if( allData != null )
+		ControlsPanel( PaintWindowComponent pwc )
 		{
-			calcGraphics.setColor( Color.BLACK ) ;
-			allGraphics.setColor( Color.BLACK ) ;
-			shownGraphics.setColor( Color.BLACK ) ;
-//			draw( g, allData, "x", false ) ;
-			Iterator<Instance> iter = allData.listIterator( ) ;
+			this.pwc = pwc ;
+			
+			allButton = new JRadioButton( ALL ) ;
+			calculatedButton = new JRadioButton( CALC ) ;
+			shownButton = new JRadioButton( SHOWN ) ;
+			add( allButton ) ;
+			add( calculatedButton ) ;
+			add( shownButton ) ;
+			
+			ButtonGroup group = new ButtonGroup( ) ;
+			group.add( allButton ) ;
+			group.add( calculatedButton ) ;
+			group.add( shownButton ) ;
+			allButton.setSelected( true ) ;
+			
+			allButton.addActionListener( this ) ;
+			calculatedButton.addActionListener( this ) ;
+			shownButton.addActionListener( this ) ;
+		}
+		
+		@Override
+		public void actionPerformed( ActionEvent evt )
+		{
+			JRadioButton btn = ( JRadioButton ) evt.getSource( ) ;
+			
+			if( btn.getText( ).equals( ALL ) )
+				pwc.mode = Mode.all ;
+			else if( btn.getText( ).equals( CALC ) )
+				pwc.mode = Mode.calc ;
+			else pwc.mode = Mode.shown ;
+			
+			pwc.repaint( ) ;
+		}
+		
+		@Override
+		public void setEnabled( boolean enabled )
+		{
+			super.setEnabled( enabled ) ;
+			allButton.setEnabled( enabled ) ;
+			calculatedButton.setEnabled( enabled ) ;
+			shownButton.setEnabled( enabled );
+		}
+	}
+	
+	/**
+	 * what to draw
+	 */
+	enum Mode { all, calc, shown } ;
+	
+	class PaintWindowComponent
+	extends JComponent
+	{
+		Mode mode = Mode.all ;
+		
+		Dataset allData ;
+		Dataset[] clusterData ;
+		Dataset[] removeData ;
+		
+		@Override
+		protected void paintComponent( Graphics g )
+		{
+			draw( g ) ;
+		}
+
+		public void setData( Dataset dataset, Dataset[] data, Dataset[] totalRemoveData )
+		{
+			this.allData = dataset ;
+			this.clusterData = data ;
+			this.removeData = totalRemoveData ;
+		}
+		
+		/**
+		 * Draws the given data
+		 * 
+		 * @param allDataFrame make sure to set the size and make visible outside of this method
+		 * @param allData	All of the data points
+		 * @param clusterData	All of the sets of clusters
+		 * @param removeData	The data points to be "removed"
+		 */
+		private void draw( Graphics g )
+		{
+			FastConvexHull hullExecutor = new FastConvexHull( ) ;
+			Font f = g.getFont( ).deriveFont( 8.0f ) ;
+			g.setFont( f ) ;
+			
+			if( mode == Mode.all && allData != null )
+			{
+				g.setColor( Color.BLACK ) ;
+				Iterator<Instance> iter = allData.listIterator( ) ;
+				while( iter.hasNext( ) )
+				{
+					Instance inst = iter.next( ) ;
+					int x = inst.get( 0 ).intValue( ) ;
+					int y = inst.get( 1 ).intValue( ) ;
+					g.drawString( "x", x, y ) ;
+				}
+			}
+			else if( mode == Mode.shown && allData != null && removeData != null )
+			{
+				g.setColor( Color.BLACK ) ;
+				Iterator<Instance> iter = allData.listIterator( ) ;
+				while( iter.hasNext( ) )
+				{
+					Instance inst = iter.next( ) ;
+					int x = inst.get( 0 ).intValue( ) ;
+					int y = inst.get( 1 ).intValue( ) ;
+					
+					// was this datapoint removed? if not then draw it on g
+					boolean removed = false ;
+					for( int i = 0 ; i < removeData.length ; i++ )
+						if( removeData[i].contains( inst ) ) removed = true ;
+					
+					if( !removed )
+						g.drawString( "x", x, y ) ;
+				}
+			}
+			else if( mode == Mode.calc && allData != null && removeData != null && clusterData != null )
+			{
+				// draw all of the data points
+				g.setColor( Color.BLACK ) ;
+				Iterator<Instance> iter = allData.listIterator( ) ;
+				while( iter.hasNext( ) )
+				{
+					Instance inst = iter.next( ) ;
+					int x = inst.get( 0 ).intValue( ) ;
+					int y = inst.get( 1 ).intValue( ) ;
+					g.drawString( "x", x, y ) ;
+				}
+				
+				// now draw the hulls
+				g.setColor( Color.RED ) ;
+				for( int i = 0 ; i < clusterData.length ; i++ )
+				{
+//					draw( g, clusterData[i], "x", false ) ;
+					
+					// draw the hull
+					if( clusterData[i].size( ) > 1 )
+					{
+						ArrayList<Point> points = new ArrayList<Point>( clusterData[i].size( ) ) ;
+						for( int j = 0 ; j < clusterData[i].size( ) ; j++ )
+							points.add( new Point( clusterData[i].get( j ).get( 0 ).intValue( ), 
+									clusterData[i].get( j ).get(  1 ).intValue( ) ) ) ;
+						ArrayList<Point> hull = hullExecutor.execute( points ) ;
+						Point last = hull.get( 0 ) ;
+						Point first = last ;
+						for( int j = 1 ; j < hull.size( ) ; j++ )
+						{
+							Point p = hull.get( j ) ;
+							g.drawLine( last.x, last.y, p.x, p.y ) ;
+							last = p ; 
+						}
+						g.drawLine( last.x, last.y, first.x, first.y ) ;
+					}
+				}
+				// now draw the removed points
+				g.setColor( Color.BLUE ) ;
+				for( int i = 0 ; i < removeData.length ; i++ )
+					draw( g, removeData[i], "x", false ) ;
+			}
+		}
+		
+		private void draw( Graphics g, Dataset dataset, String s, boolean drawline )
+		{
+
+			Iterator<Instance> iter = dataset.listIterator( ) ;
+			int lastx = -1, lasty = -1 ;
 			while( iter.hasNext( ) )
 			{
 				Instance inst = iter.next( ) ;
 				int x = inst.get( 0 ).intValue( ) ;
 				int y = inst.get( 1 ).intValue( ) ;
-				calcGraphics.drawString( "x", x, y ) ;
-				allGraphics.drawString( "x", x, y ) ;
-				
-				// was this datapoint removed? if not then draw it on shownGraphics
-				boolean removed = false ;
-				for( int i = 0 ; i < removeData.length ; i++ )
-					if( removeData[i].contains( inst ) ) removed = true ;
-				
-				if( !removed )
-					shownGraphics.drawString( "x", x, y ) ;
+				g.drawString( s, x, y ) ;
+				if( drawline && lastx != -1 )
+					g.drawLine( x, y, lastx, lasty );
+				lastx = x ;
+				lasty = y ;
 			}
-		}
-		
-		if( clusterData != null )
-		{
-			calcGraphics.setColor( Color.RED ) ;
-			for( int i = 0 ; i < clusterData.length ; i++ )
-			{
-//				draw( g, clusterData[i], "x", false ) ;
-				
-				// draw the hull
-				if( clusterData[i].size( ) > 1 )
-				{
-					ArrayList<Point> points = new ArrayList<Point>( clusterData[i].size( ) ) ;
-					for( int j = 0 ; j < clusterData[i].size( ) ; j++ )
-						points.add( new Point( clusterData[i].get( j ).get( 0 ).intValue( ), 
-								clusterData[i].get( j ).get(  1 ).intValue( ) ) ) ;
-					ArrayList<Point> hull = hullExecutor.execute( points ) ;
-					Point last = hull.get( 0 ) ;
-					Point first = last ;
-					for( int j = 1 ; j < hull.size( ) ; j++ )
-					{
-						Point p = hull.get( j ) ;
-						calcGraphics.drawLine( last.x, last.y, p.x, p.y ) ;
-						last = p ; 
-					}
-					calcGraphics.drawLine( last.x, last.y, first.x, first.y ) ;
-				}
-			}
-		}
-		
-		if( removeData!= null )
-		{
-			calcGraphics.setColor( Color.BLUE ) ;
-			for( int i = 0 ; i < removeData.length ; i++ )
-				draw( calcGraphics, removeData[i], "x", false ) ;
-		}
-	}
-	
-	private void draw( Graphics g, Dataset dataset, String s, boolean drawline )
-	{
-
-		Iterator<Instance> iter = dataset.listIterator( ) ;
-		int lastx = -1, lasty = -1 ;
-		while( iter.hasNext( ) )
-		{
-			Instance inst = iter.next( ) ;
-			int x = inst.get( 0 ).intValue( ) ;
-			int y = inst.get( 1 ).intValue( ) ;
-			g.drawString( s, x, y ) ;
-			if( drawline && lastx != -1 )
-				g.drawLine( x, y, lastx, lasty );
-			lastx = x ;
-			lasty = y ;
 		}
 	}
 }
