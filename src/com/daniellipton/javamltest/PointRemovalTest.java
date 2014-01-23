@@ -14,12 +14,19 @@ import java.util.Random;
 import javax.swing.JFrame;
 
 import net.sf.javaml.clustering.Clusterer;
+import net.sf.javaml.clustering.DensityBasedSpatialClustering;
 import net.sf.javaml.clustering.KMeans;
 import net.sf.javaml.core.Dataset;
 import net.sf.javaml.core.DefaultDataset;
 import net.sf.javaml.core.DenseInstance;
 import net.sf.javaml.core.Instance;
 
+/**
+ * Divide and conquer to remove superfluous data points on a 2D field
+ * 
+ * @author daniellipton
+ *
+ */
 public class PointRemovalTest
 {	
 	private NumberFormat nf = NumberFormat.getNumberInstance( ) ;
@@ -27,9 +34,9 @@ public class PointRemovalTest
 	public static void main( String[] args )
 	{
 		int WIDTH = 1920/3, HEIGHT = 1080/3 ;
-		int POINTS = 10000 ; // points to draw on the screen
+		int POINTS = 5000 ; // points to draw on the screen
 		int DIST = 10 ; // minimum distance between points
-		int CLUSTERS = 15 ; // clusters to distribute the data
+		int CLUSTERS = POINTS/50 ; // clusters to distribute the data
 		PointRemovalTest test = new PointRemovalTest( ) ;
 		test.execute( true, WIDTH, HEIGHT, POINTS, DIST, CLUSTERS ) ;
 	}
@@ -42,7 +49,7 @@ public class PointRemovalTest
 	public void execute( boolean draw, int width, int height, int points, int distance, int clusters )
 	{
 		Dataset dataset = new DefaultDataset( ) ;
-//		Clusterer clusterer = new DensityBasedSpatialClustering( .009, 2 ) ;
+		Clusterer dbsc = new DensityBasedSpatialClustering( .05, 2 ) ;
 		Clusterer clusterer = new KMeans( clusters ) ;
 //		Clusterer clusterer = new KMedoids( ) ;
 //		Clusterer clusterer = new SOM( ) ;
@@ -53,12 +60,12 @@ public class PointRemovalTest
 		{
 			// set up window frames
 			allDataFrame = new JFrame( "All Data" ) ;
+			shownDataFrame = new JFrame( "Shown Data" ) ;
+			calcDataFrame = new JFrame( "Calculated Data" ) ;
 			allDataFrame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
 			allDataFrame.setMinimumSize( new Dimension( width, height ) );
-			shownDataFrame = new JFrame( "Shown Data" ) ;
 			shownDataFrame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
 			shownDataFrame.setMinimumSize( new Dimension( width, height ) );
-			calcDataFrame = new JFrame( "Calculated Data" ) ;
 			calcDataFrame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
 			calcDataFrame.setMinimumSize( new Dimension( width, height ) );
 			calcDataFrame.setLocation( allDataFrame.getLocation( ).x + width + 10, allDataFrame.getLocation( ).y );
@@ -73,29 +80,26 @@ public class PointRemovalTest
 		}
 		
 		// calculate random data points around clusters
-		System.out.println( "calculating data..." );
-		double latStdev = height / 15, longStdev = width / 15 ;
-		Random rand = new Random( System.currentTimeMillis( ) ) ;
-		for( int i = 0 ; i < clusters ; i++ )
-		{
-			double longt = rand.nextInt( width ) ;
-			double lat = rand.nextInt( height )  ;
-			double[] vals = { longt, lat } ;
-			Instance inst = new DenseInstance( vals ) ;
-			dataset.add( inst ) ;
-			for( int j = 0 ; j < ( points/clusters - 1 ) ; j++ )
-			{
-				double y = Math.max( 1, Math.min( height, ( int ) lat + rand.nextGaussian( ) * latStdev ) ) ;
-				double x = Math.max( 1, Math.min( width, ( int ) longt + rand.nextGaussian( ) * longStdev ) ) ;
-				vals = new double[]{ x, y } ;
-				inst = new DenseInstance( vals ) ;
-				dataset.add( inst ) ;
-			}
-		}
+		calculateRandomData( width, height, points, clusters, dataset ) ;
 		
 		// find points to remove
-		System.out.println( "clustering..." );
+		System.out.println( "clustering..." ) ;
+		System.out.println( "cluster neighbors..." ) ;
 		Dataset[] data = cluster( clusterer, dataset ) ;
+		System.out.println( "determine dbsc removal..." ) ;
+		long t1 = System.currentTimeMillis( ) ;
+		ArrayList<Dataset> removals = new ArrayList<Dataset>( ) ;
+		for( int i = 0 ; i < data.length ; i++ )
+		{
+			 Dataset[] tmpDatasets = dbsc.cluster( data[i] ) ;
+			 for( int j = 0 ; j < tmpDatasets.length ; j++ )
+				 removals.add( tmpDatasets[j] ) ;
+		}
+		Dataset[] totalRemoveData = removals.toArray( new Dataset[removals.size( )] ) ;
+		double t2 = (System.currentTimeMillis( ) - t1 ) / 1000d ;
+		System.out.println( "dbsc clustering time="+nf.format( t2 ) ) ;
+		
+		/*
 		Dataset[] removeData = findClosestPoints( data, distance ) ;
 		// one more time on the remaining data w/o clusters
 		// first create the set of all data not removed
@@ -117,6 +121,7 @@ public class PointRemovalTest
 		Dataset[] totalRemoveData = new Dataset[removeData.length + removeData2.length] ;
 		System.arraycopy( removeData, 0, totalRemoveData, 0, removeData.length ) ;
 		System.arraycopy( removeData2, 0, totalRemoveData, removeData.length, removeData2.length ) ;
+		*/
 		
 		if( draw )
 		{
@@ -126,6 +131,33 @@ public class PointRemovalTest
 			shownDataFrame.setCursor( c ) ;
 			calcDataFrame.setCursor( c ) ; 
 			allDataFrame.setCursor( c ) ; // done
+		}
+	}
+
+	/**
+	 * Calculates pseudo-random data. The latStdev and longStdev tend to do better with smaller numbers 
+	 * given more data points
+	 */
+	private void calculateRandomData( int width, int height, int points, int clusters, Dataset dataset )
+	{
+		System.out.println( "calculating data..." );
+		double latStdev = height / 30, longStdev = width / 30 ;
+		Random rand = new Random( System.currentTimeMillis( ) ) ;
+		for( int i = 0 ; i < clusters ; i++ )
+		{
+			double longt = rand.nextInt( width ) ;
+			double lat = rand.nextInt( height )  ;
+			double[] vals = { longt, lat } ;
+			Instance inst = new DenseInstance( vals ) ;
+			dataset.add( inst ) ;
+			for( int j = 0 ; j < ( points/clusters - 1 ) ; j++ )
+			{
+				double y = Math.max( 1, Math.min( height, ( int ) lat + rand.nextGaussian( ) * latStdev ) ) ;
+				double x = Math.max( 1, Math.min( width, ( int ) longt + rand.nextGaussian( ) * longStdev ) ) ;
+				vals = new double[]{ x, y } ;
+				inst = new DenseInstance( vals ) ;
+				dataset.add( inst ) ;
+			}
 		}
 	}
 	
